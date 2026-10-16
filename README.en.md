@@ -86,4 +86,4 @@ Uninstall with `sudo apt remove itl612-cm5`. Personal settings, photos and video
 
 ## Developer checks
 
-Normal packages exclude tests, benchmarks and UI audit entry points by default. To enable development checks, configure with `-DBUILD_TESTING=ON -DBUILD_TOOLS=ON`; run `ctest --test-dir <build-directory>` for the measurement-overlay check. Normal builds do not depend on Apple projects, model weights or field recordings.
+Normal packages exclude tests, benchmarks and UI audit entry points by default. To enable development checks, configure with `-DBUILD_TESTING=ON -DBUILD_TOOLS=ON`; run `ctest --test-dir <build-directory>` for the measurement-overlay check. 
