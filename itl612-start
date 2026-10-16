@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+# Keep one camera owner even when the desktop icon is clicked repeatedly.
+state_dir="${XDG_RUNTIME_DIR:-$HOME/.cache}/itl612-cm5"
+mkdir -p "$state_dir"
+exec 9>"$state_dir/preview.lock"
+flock -n 9 || exit 0
+export OMP_NUM_THREADS=4
+export OMP_WAIT_POLICY=PASSIVE
+export GOMP_SPINCOUNT=0
+# The application chooses the tested platform for the installed Qt version.
+launcher_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$launcher_dir/itl612-cm5" "$@"

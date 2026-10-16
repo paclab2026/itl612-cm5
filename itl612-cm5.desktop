@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ITL612 CM5
+Name[zh_CN]=ITL612 热像
+Comment=Mars thermal preview · Motion / Autogate
+Exec=itl612-start
+Icon=itl612-cm5
+Terminal=false
+Categories=Graphics;
+StartupNotify=false
