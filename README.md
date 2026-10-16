@@ -30,7 +30,7 @@ sudo apt install ./itl612-cm5_0.1.0_arm64.deb
 sudo apt install --no-install-recommends cmake g++ make pkg-config \
   libusb-1.0-0-dev qt6-base-dev libqt6opengl6-dev qt6-wayland \
   libegl-dev libgles-dev ffmpeg fonts-noto-cjk xdg-user-dirs desktop-file-utils
-./install.sh
+sh install.sh
 sudo install -m 0644 70-itl612-mars.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 ```
@@ -43,7 +43,7 @@ sudo udevadm control --reload-rules
 
 ```sh
 sudo apt install dpkg-dev
-./packaging/build-deb.sh
+sh packaging/build-deb.sh
 ```
 
 输出为 `build-deb/itl612-cm5_0.1.0_arm64.deb`。依赖由实际二进制自动分析，程序使用系统 Qt、Mesa 和 FFmpeg。运行 `python3 packaging/make-source.py build-deb` 可生成独立源码包；构建产物和本机开发脚本不进入源码包。

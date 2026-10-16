@@ -24,7 +24,7 @@ Run these commands inside this standalone source directory on the Pi:
 sudo apt install --no-install-recommends cmake g++ make pkg-config \
   libusb-1.0-0-dev qt6-base-dev libqt6opengl6-dev qt6-wayland \
   libegl-dev libgles-dev ffmpeg fonts-noto-cjk xdg-user-dirs desktop-file-utils
-./install.sh
+sh install.sh
 sudo install -m 0644 70-itl612-mars.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 ```
@@ -37,7 +37,7 @@ Build on the target architecture and distribution. For the validated arm64/Bookw
 
 ```sh
 sudo apt install dpkg-dev
-./packaging/build-deb.sh
+sh packaging/build-deb.sh
 ```
 
 The `.deb` is placed in `build-deb/`. Runtime shared-library dependencies are generated from the actual binary. A clean source archive can be generated using `python3 packaging/make-source.py build-deb`; build output and development media are excluded.

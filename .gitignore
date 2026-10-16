@@ -1,0 +1,8 @@
+build*/
+dist/
+_CPack_Packages/
+__pycache__/
+*.pyc
+*.deb
+*.tar.gz
+.DS_Store
