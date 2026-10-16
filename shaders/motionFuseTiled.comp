@@ -1,0 +1,23 @@
+#version 310 es
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) readonly buffer B0 {uint raw[];};
+layout(std430,binding=1) readonly buffer B1 {uint slots[];};
+layout(std430,binding=2) readonly buffer B2 {vec2 warped[];};
+layout(std430,binding=3) readonly buffer B3 {vec2 alignment[];};
+layout(std430,binding=4) readonly buffer B4 {float baseline[];};
+layout(std430,binding=5) readonly buffer B5 {float baselineN[];};
+layout(std430,binding=6) writeonly buffer B6 {float resultData[];};
+layout(std430,binding=7) writeonly buffer B7 {float effective[];};
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uint count;uniform float sigma;shared vec2 tile[100];
+void main(){uint tid=gl_LocalInvocationID.x,group=gl_WorkGroupID.x;ivec2 origin=ivec2(int(group%80u)*8,int(group/80u)*8),q=origin+ivec2(int(tid%8u),int(tid/8u));uint i=uint(q.y*640+q.x),center=(tid/8u+1u)*10u+tid%8u+1u;float sum=0.0,sw=1.0,sw2=1.0;uint used=0u;
+ bool interior=q.x>0&&q.y>0&&q.x<639&&q.y<511;
+ for(uint k=1u;k<count;k++){if(alignment[k].y==0.0)continue;uint start=(k-1u)*327680u;
+ for(uint j=tid;j<100u;j+=64u){ivec2 at=clamp(origin+ivec2(int(j%10u)-1,int(j/10u)-1),ivec2(0),ivec2(639,511));tile[j]=warped[start+uint(at.y*640+at.x)];}barrier();
+ if(interior){float mse=0.0;bool valid=true;for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 d=tile[uint(int(center)+y*10+x)];valid=valid&&d.y>0.0;mse+=d.x*d.x;}if(valid){float robust=max(0.0,1.0-mse/(9.0*36.0*sigma*sigma)),weight=robust*robust*alignment[k].y;if(weight>0.0)used++;sum+=weight*tile[center].x;sw+=weight;sw2+=weight*weight;}}barrier();}
+ float ne=sw*sw/sw2;bool gain=used>0u&&ne>baselineN[i]+.05;resultData[i]=gain?float(rawAt(slots[0]*327680u+i))+sum/sw:baseline[i];effective[i]=gain?ne:baselineN[i];
+}

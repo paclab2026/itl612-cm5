@@ -1,0 +1,16 @@
+#version 310 es
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) readonly buffer B0 {float base[];};
+layout(std430,binding=1) readonly buffer B1 {float baseN[];};
+layout(std430,binding=2) readonly buffer B2 {float candidate[];};
+layout(std430,binding=3) readonly buffer B3 {float candidateN[];};
+layout(std430,binding=4) writeonly buffer B4 {float resultData[];};
+layout(std430,binding=5) writeonly buffer B5 {float effective[];};
+layout(std430,binding=6) readonly buffer B6 {vec2 energy[];};
+uniform float sigma;shared vec2 tile[100];
+void main(){uint tid=gl_LocalInvocationID.x,group=gl_WorkGroupID.x;ivec2 origin=ivec2(int(group%80u)*8,int(group/80u)*8),q=origin+ivec2(int(tid%8u),int(tid/8u));uint i=uint(q.y*640+q.x),center=(tid/8u+1u)*10u+tid%8u+1u;
+ for(uint j=tid;j<100u;j+=64u){ivec2 at=clamp(origin+ivec2(int(j%10u)-1,int(j/10u)-1),ivec2(0),ivec2(639,511));tile[j]=energy[uint(at.y*640+at.x)];}barrier();
+ vec2 en=vec2(0);for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++)en+=tile[uint(int(center)+y*10+x)];en/=9.0;float blend=en.x>9.0*sigma*sigma?clamp((.98-sqrt(en.y/max(en.x,1e-6)))/.08,0.0,1.0):0.0;resultData[i]=mix(candidate[i],base[i],blend);effective[i]=blend==0.0?candidateN[i]:(blend==1.0?baseN[i]:min(candidateN[i],baseN[i]));
+}

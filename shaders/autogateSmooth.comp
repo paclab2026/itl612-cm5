@@ -1,0 +1,22 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint hist[]; };
+layout(std430,binding=1) buffer B1 { float smoothed[]; };
+uniform vec2 noiseSpan;
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+    if(i>=512u)return;
+    float sigma=clamp(noiseSpan.x*512./max(noiseSpan.y,1.),1.,32.);
+    int radius=int(ceil(4.*sigma));float sum=0,weight=0;
+    for(int j=-radius;j<=radius;j++) {
+        int at=int(i)+j;if(at<0)at=-at;if(at>511)at=1022-at;
+        float w=exp(-.5*float(j*j)/(sigma*sigma));sum+=float(hist[at])*w;weight+=w;
+    }
+    smoothed[i]=sum/weight;
+
+}

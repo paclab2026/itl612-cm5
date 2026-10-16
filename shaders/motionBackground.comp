@@ -1,0 +1,26 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { uint slots[]; };
+layout(std430,binding=2) buffer B2 { vec4 model[]; };
+layout(std430,binding=3) buffer B3 { vec2 alignment[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uvec4 p;
+layout(std430,binding=5) buffer B5 { vec2 patches[]; };
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+uint k=i;
+ if(k>=p.x)return;alignment[k]=vec2(0);if(k==0){alignment[k]=vec2(0,1);return;}if(model[k].w==0)return;float centers[16];uint quads[16],n=0;
+ for(uint region=0;region<16;region++){vec2 patchValue=patches[k*16+region];if(patchValue.y<=3){centers[n]=patchValue.x;quads[n]=((region/4)/2)*2+(region%4)/2;n++;}}
+ if(n<8)return;float ordered[16];for(uint i=0;i<n;i++)ordered[i]=centers[i];for(uint i=1;i<n;i++){float t=ordered[i];int j=int(i)-1;while(j>=0&&ordered[j]>t){ordered[j+1]=ordered[j];j--;}ordered[j+1]=t;}float mid=ordered[n/2];uint accepted=0,bits=0;for(uint i=0;i<n;i++)if(abs(centers[i]-mid)<=2){ordered[accepted++]=centers[i];bits|=1u<<quads[i];}
+ if(accepted<8||bitCount(bits)<3)return;for(uint i=1;i<accepted;i++){float t=ordered[i];int j=int(i)-1;while(j>=0&&ordered[j]>t){ordered[j+1]=ordered[j];j--;}ordered[j+1]=t;}mid=ordered[accepted/2];if(abs(mid)<=32)alignment[k]=vec2(mid,float(accepted)/16);
+
+}

@@ -1,0 +1,18 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { float base[]; };
+layout(std430,binding=1) buffer B1 { float candidate[]; };
+layout(std430,binding=2) buffer B2 { vec2 energy[]; };
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+vec2 motionGradient(bool candidateSource,ivec2 q){q=clamp(q,ivec2(2),ivec2(637,509));vec2 g=vec2(0);for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){uint i=uint((q.y+y)*640+q.x+x);if(candidateSource)g+=vec2(candidate[i+1u]-candidate[i-1u],candidate[i+640u]-candidate[i-640u]);else g+=vec2(base[i+1u]-base[i-1u],base[i+640u]-base[i-640u]);}return g*(4.0/18.0);}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+ if(i>=640*512)return;ivec2 q=ivec2(i%640,i/640);vec2 gb=motionGradient(false,q),gd=motionGradient(true,q);energy[i]=vec2(dot(gb,gb),dot(gd,gd));
+
+}

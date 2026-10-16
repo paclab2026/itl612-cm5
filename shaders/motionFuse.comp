@@ -1,0 +1,32 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { uint slots[]; };
+layout(std430,binding=2) buffer B2 { vec4 model[]; };
+layout(std430,binding=3) buffer B3 { vec2 alignment[]; };
+layout(std430,binding=4) buffer B4 { float baseline[]; };
+layout(std430,binding=5) buffer B5 { float baselineN[]; };
+layout(std430,binding=6) buffer B6 { float resultData[]; };
+layout(std430,binding=7) buffer B7 { float effective[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uvec4 p;
+uniform float sigma;
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+float motionRaw(uint base,vec2 q){uint w=640u,h=512u;q=clamp(q,vec2(0),vec2(w-1u,h-1u));uvec2 j=uvec2(q);vec2 f=fract(q);return mix(mix(float(rawAt(base+j.y*w+j.x)),float(rawAt(base+j.y*w+min(j.x+1u,w-1u))),f.x),mix(float(rawAt(base+min(j.y+1u,h-1u)*w+j.x)),float(rawAt(base+min(j.y+1u,h-1u)*w+min(j.x+1u,w-1u))),f.x),f.y);}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+ if(i>=640*512)return;vec2 q=vec2(i%640,i/640);uint abase=slots[0]*640*512;float sum=0,sw=1,sw2=1;uint used=0;
+ if(all(greaterThan(q,vec2(0)))&&all(lessThan(q,vec2(639,511))))for(uint k=1;k<p.x;k++){if(alignment[k].y==0)continue;uint bbase=slots[k]*640*512;float mse=0;bool valid=true;for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 z=q+vec2(x,y),r=motionPoint(z,model[k]);valid=valid&&all(greaterThanEqual(r,vec2(1)))&&all(lessThan(r,vec2(638,510)));float delta=motionRaw(bbase,r)+alignment[k].x-float(rawAt(abase+uint(z.y)*640+uint(z.x)));mse+=delta*delta;}if(!valid)continue;float robust=max(0.,1-mse/(9*36*sigma*sigma)),weight=robust*robust*alignment[k].y;if(weight>0)used++;sum+=weight*(motionRaw(bbase,motionPoint(q,model[k]))+alignment[k].x-float(rawAt(abase+i)));sw+=weight;sw2+=weight*weight;}
+ // No reliable reprojection: preserve the established native-coordinate fallback.
+ float ne=sw*sw/sw2;bool gain=used>0u&&ne>baselineN[i]+.05;resultData[i]=gain?float(rawAt(abase+i))+sum/sw:baseline[i];effective[i]=gain?ne:baselineN[i];
+
+}

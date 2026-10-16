@@ -1,0 +1,25 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { vec2 costs[]; };
+layout(std430,binding=1) buffer B1 { vec4 model[]; };
+uniform uvec4 p;
+uniform vec4 v;
+uniform float sigma;
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+uint k=gl_GlobalInvocationID.x;if(k>=p.x)return;if(k==0u){model[k]=vec4(0,0,0,1);return;}if(p.w>0u&&model[k].w==0.0)return;
+uint side=2u*p.y+1u,nc=side*side*(2u*p.z+1u),bestIndex=0u;float best=uintBitsToFloat(0x7f800000u);
+for(uint j=0u;j<nc;j++){float value=costs[k*nc+j].x;float tie=1e-8*float(abs(int(j%side)-int(p.y))+abs(int(j/side%side)-int(p.y))+abs(int(j/(side*side))-int(p.z)));if(value+tie<best){best=value+tie;bestIndex=j;}}
+float second=uintBitsToFloat(0x7f800000u);for(uint j=0u;j<nc;j++){if(abs(int(j%side)-int(bestIndex%side))>1||abs(int(j/side%side)-int(bestIndex/side%side))>1)second=min(second,costs[k*nc+j].x);}
+vec4 m=p.w==0u?vec4(0):model[k];m.xy+=vec2(int(bestIndex%side)-int(p.y),int(bestIndex/side%side)-int(p.y))*v.z;m.z+=float(int(bestIndex/(side*side))-int(p.z))*v.w;
+float en=costs[k*nc+bestIndex].y,scale=640.0/v.x,noise=sigma*sigma/(scale*scale);bool finiteBest=!isnan(best)&&!isinf(best);bool good=p.w==3u?finiteBest:finiteBest&&en>max(.01,noise*.25)&&best<1.25*en+4.0*noise;
+if(p.w==0u)m.w=good&&!isnan(second)&&!isinf(second)&&(second-best)/max(second,1e-6)>.025?1.0:0.0;else m.w*=good?1.0:0.0;model[k]=m;
+
+}

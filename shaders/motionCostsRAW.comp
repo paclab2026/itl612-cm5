@@ -1,0 +1,37 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { uint slots[]; };
+layout(std430,binding=2) buffer B2 { vec4 model[]; };
+layout(std430,binding=3) buffer B3 { vec2 costs[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+float rawFloat(uint i){return float(rawAt(i));}
+uniform uvec4 p;
+uniform vec4 v;
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+float motionSample(uint base,uint w,uint h,vec2 q){q=clamp(q,vec2(0),vec2(w-1u,h-1u));uvec2 j=uvec2(q);vec2 f=fract(q);return mix(mix(rawFloat(base+j.y*w+j.x),rawFloat(base+j.y*w+min(j.x+1u,w-1u)),f.x),mix(rawFloat(base+min(j.y+1u,h-1u)*w+j.x),rawFloat(base+min(j.y+1u,h-1u)*w+min(j.x+1u,w-1u)),f.x),f.y);}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+ uint side=2*p.y+1,na=2*p.z+1,nc=side*side*na,k=i/nc;if(k>=p.x)return;if(k==0 || (p.w>0 && model[k].w==0))return;uint candidate=i%nc;vec4 seed=p.w==0?vec4(0):model[k];vec4 m=seed;m.xy+=vec2(int(candidate%side)-int(p.y),int(candidate/side%side)-int(p.y))*v.z;m.z+=(int(candidate/(side*side))-int(p.z))*v.w;
+ uint w=uint(v.x),h=uint(v.y);float scale=640./w;uint abase=slots[0]*w*h,bbase=slots[k]*w*h;float errors[9],energy=0;uint valid=0;
+ if(p.w==3){float means[9],variance[9],ordered[9];energy=0;valid=0;for(uint region=0;region<9;region++){float sum=0,ss=0;bool inside=true;vec2 center=vec2((float(region%3)+.65)*w/3,(float(region/3)+.65)*h/3);for(uint j=0;j<16;j++){vec2 q=center+vec2(int(j%4)*2-3,int(j/4)*2-3),r=motionPoint(q,m);inside=inside&&all(greaterThan(r,vec2(1)))&&all(lessThan(r,vec2(w-2,h-2)));float d=motionSample(bbase,w,h,r)-motionSample(abase,w,h,q);sum+=d;ss+=d*d;}means[region]=sum/16;variance[region]=inside?max(0.,ss/16-means[region]*means[region]):uintBitsToFloat(0x7f800000u);ordered[region]=means[region];valid+=inside?1u:0u;}
+ for(uint x=1;x<9;x++){float t=ordered[x];int y=int(x)-1;while(y>=0&&ordered[y]>t){ordered[y+1]=ordered[y];y--;}ordered[y+1]=t;}float center=ordered[4];for(uint r=0;r<9;r++)errors[r]=variance[r]+(means[r]-center)*(means[r]-center);for(uint x=1;x<9;x++){float t=errors[x];int y=int(x)-1;while(y>=0&&errors[y]>t){errors[y+1]=errors[y];y--;}errors[y+1]=t;}costs[i]=vec2(valid>=7?errors[4]:uintBitsToFloat(0x7f800000u),0);return;
+ }
+
+ for(uint region=0;region<9;region++){float e=0,en=0;bool inside=true;for(uint j=0;j<4;j++){vec2 q=vec2((float(region%3)+.65)*w/3+(int(j%2)*2-1)*2,(float(region/3)+.65)*h/3+(int(j/2)*2-1)*2);vec2 r=motionPoint(q*scale,m)/scale;inside=inside&&all(greaterThan(r,vec2(1)))&&all(lessThan(r,vec2(w-2,h-2)));vec2 ga=vec2(motionSample(abase,w,h,q+vec2(1,0))-motionSample(abase,w,h,q-vec2(1,0)),motionSample(abase,w,h,q+vec2(0,1))-motionSample(abase,w,h,q-vec2(0,1)))*.5;vec2 gb=vec2(motionSample(bbase,w,h,r+vec2(1,0))-motionSample(bbase,w,h,r-vec2(1,0)),motionSample(bbase,w,h,r+vec2(0,1))-motionSample(bbase,w,h,r-vec2(0,1)))*.5;
+ // Rotate history gradient into current coordinates.
+ float c=cos(m.z),s=sin(m.z);gb=vec2(c*gb.x+s*gb.y,-s*gb.x+c*gb.y);e+=dot(ga-gb,ga-gb);en+=dot(ga,ga);}
+ errors[region]=inside?e*.25:uintBitsToFloat(0x7f800000u);energy+=en*.25;valid+=inside?1u:0u;}
+ for(uint x=1;x<9;x++){float t=errors[x];int y=int(x)-1;while(y>=0&&errors[y]>t){errors[y+1]=errors[y];y--;}errors[y+1]=t;}
+ costs[i]=vec2(valid>=7?errors[4]:uintBitsToFloat(0x7f800000u),energy/9);
+
+}

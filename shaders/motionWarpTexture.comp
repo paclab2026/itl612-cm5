@@ -1,0 +1,18 @@
+#version 310 es
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+uniform highp usampler2DArray rawTex;
+uint rawAt(uint j){return texelFetch(rawTex,ivec3(int(j%640u),int(j/640u%512u),int(j/327680u)),0).r;}
+layout(std430,binding=1) readonly buffer B1 { uint slots[]; };
+layout(std430,binding=2) readonly buffer B2 { vec4 model[]; };
+layout(std430,binding=3) readonly buffer B3 { vec2 alignment[]; };
+layout(std430,binding=4) writeonly buffer B4 { vec2 warped[]; };
+uniform uint count;
+float sampleRaw(uint base,vec2 q){q=clamp(q,vec2(0),vec2(639,511));uvec2 j=uvec2(q);vec2 f=fract(q);return mix(mix(float(rawAt(base+j.y*640u+j.x)),float(rawAt(base+j.y*640u+min(j.x+1u,639u))),f.x),mix(float(rawAt(base+min(j.y+1u,511u)*640u+j.x)),float(rawAt(base+min(j.y+1u,511u)*640u+min(j.x+1u,639u))),f.x),f.y);}
+void main(){uint g=gl_GlobalInvocationID.x,i=g%327680u,k=g/327680u+1u;if(k>=count)return;
+ if(alignment[k].y==0.0){warped[(k-1u)*327680u+i]=vec2(0);return;}
+ vec2 q=vec2(i%640u,i/640u),v=q-vec2(319.5,255.5);float c=cos(model[k].z),s=sin(model[k].z);vec2 r=vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+model[k].xy;
+ bool valid=all(greaterThanEqual(r,vec2(1)))&&all(lessThan(r,vec2(638,510)));
+ float delta=sampleRaw(slots[k]*327680u,r)+alignment[k].x-float(rawAt(slots[0]*327680u+i));warped[(k-1u)*327680u+i]=vec2(delta,valid?1.0:0.0);
+}

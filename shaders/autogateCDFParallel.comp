@@ -1,0 +1,20 @@
+#version 310 es
+precision highp float;precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) readonly buffer B0 {float smoothed[];};
+layout(std430,binding=1) buffer B1 {float cdf[];};
+layout(std430,binding=2) readonly buffer B2 {float effective[];};
+uniform vec2 noiseSpan;
+shared float reductions[64];shared float wanted[512];shared float massAt[512];
+shared float total,ceiling,lo,hi,mass;
+float sumGroup(float value){uint lane=gl_LocalInvocationID.x;reductions[lane]=value;barrier();for(uint stride=32u;stride>0u;stride>>=1u){if(lane<stride)reductions[lane]+=reductions[lane+stride];barrier();}float sum=reductions[0];barrier();return sum;}
+void main(){uint lane=gl_LocalInvocationID.x;
+ float part=0.;for(uint j=lane;j<512u;j+=64u)part+=smoothed[j];float histogramTotal=sumGroup(part);
+ part=0.;const uint samples=(327680u+256u)/257u;for(uint j=lane;j<samples;j+=64u)part+=effective[j*257u];float ne=max(1.,sumGroup(part)/float(samples));
+ if(lane==0u){total=histogramTotal;float sigma=noiseSpan.x/sqrt(ne);ceiling=min(2.5,max(1.,2.*noiseSpan.y/(229.5*sigma)))/512.;lo=0.;hi=10000.;}barrier();
+ for(uint j=lane;j<512u;j+=64u)wanted[j]=.65/512.+.35*smoothed[j]/max(total,1.);
+ barrier();
+ for(uint k=0u;k<30u;k++){float scale=(lo+hi)*.5;part=0.;for(uint j=lane;j<512u;j+=64u)part+=clamp(wanted[j]*scale,.85/512.,ceiling);float sum=sumGroup(part);if(lane==0u){if(sum>1.)hi=scale;else lo=scale;}barrier();}
+ part=0.;for(uint j=lane;j<512u;j+=64u){float value=clamp(wanted[j]*(lo+hi)*.5,.85/512.,ceiling);massAt[j]=value;part+=value;}
+ float sum=sumGroup(part);if(lane==0u){mass=sum;cdf[0]=0.;for(uint j=0u;j<512u;j++)cdf[j+1u]=cdf[j]+massAt[j]/mass;cdf[512]=1.;}
+}

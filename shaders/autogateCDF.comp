@@ -1,0 +1,30 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { float smoothed[]; };
+layout(std430,binding=1) buffer B1 { float cdf[]; };
+layout(std430,binding=2) buffer B2 { float effective[]; };
+uniform vec2 noiseSpan;
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+    if(i!=0u)return;
+    float total=0,ne=0;uint n=0;
+    for(uint j=0;j<512;j++)total+=smoothed[j];
+    for(uint j=0;j<640u*512u;j+=257u){ne+=effective[j];n++;}
+    ne=max(1.,ne/float(n));float sigma=noiseSpan.x/sqrt(ne);
+    float ceiling=min(2.5,max(1.,2.*noiseSpan.y/(229.5*sigma)))/512.;
+    float wanted[512];for(uint j=0;j<512;j++)wanted[j]=.65/512.+.35*smoothed[j]/max(total,1.);
+    float lo=0,hi=10000;
+    for(uint k=0;k<30;k++){float scale=(lo+hi)*.5,sum=0;
+        for(uint j=0;j<512;j++)sum+=clamp(wanted[j]*scale,.85/512.,ceiling);
+        if(sum>1)hi=scale;else lo=scale;
+    }
+    float mass=0;for(uint j=0;j<512;j++)mass+=clamp(wanted[j]*(lo+hi)*.5,.85/512.,ceiling);
+    cdf[0]=0;for(uint j=0;j<512;j++)cdf[j+1]=cdf[j]+clamp(wanted[j]*(lo+hi)*.5,.85/512.,ceiling)/mass;
+    cdf[512]=1;
+
+}

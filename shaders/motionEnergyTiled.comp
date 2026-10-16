@@ -1,0 +1,14 @@
+#version 310 es
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) readonly buffer B0 {float base[];};
+layout(std430,binding=1) readonly buffer B1 {float candidate[];};
+layout(std430,binding=2) writeonly buffer B2 {vec2 energy[];};
+shared vec2 tile[144];
+void main(){uint tid=gl_LocalInvocationID.x,group=gl_WorkGroupID.x;ivec2 origin=ivec2(int(group%80u)*8,int(group/80u)*8),q=origin+ivec2(int(tid%8u),int(tid/8u));uint i=uint(q.y*640+q.x);
+ for(uint j=tid;j<144u;j+=64u){ivec2 at=clamp(origin+ivec2(int(j%12u)-2,int(j/12u)-2),ivec2(0),ivec2(639,511));uint a=uint(at.y*640+at.x);tile[j]=vec2(base[a],candidate[a]);}barrier();
+ ivec2 center=clamp(q,ivec2(2),ivec2(637,509))-origin+ivec2(2);vec2 gx=vec2(0),gy=vec2(0);
+ for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){int j=(center.y+y)*12+center.x+x;gx+=tile[j+1]-tile[j-1];gy+=tile[j+12]-tile[j-12];}
+ gx*=4.0/18.0;gy*=4.0/18.0;energy[i]=vec2(gx.x*gx.x+gy.x*gy.x,gx.y*gx.y+gy.y*gy.y);
+}

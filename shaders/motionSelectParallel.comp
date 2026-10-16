@@ -1,0 +1,17 @@
+#version 310 es
+precision highp float;precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) readonly buffer B0 {vec2 costs[];};
+layout(std430,binding=1) buffer B1 {vec4 model[];};
+uniform uvec4 p;uniform vec4 v;uniform float sigma;
+shared float bestValue[64];shared uint bestIndex[64];shared float nextValue[64];
+void main(){uint k=gl_WorkGroupID.x,lane=gl_LocalInvocationID.x;if(k>=p.x)return;if(k==0u){if(lane==0u)model[k]=vec4(0,0,0,1);return;}if(p.w>0u&&model[k].w==0.0)return;
+ uint side=2u*p.y+1u,nc=side*side*(2u*p.z+1u);float best=uintBitsToFloat(0x7f800000u);uint index=0u;
+ for(uint j=lane;j<nc;j+=64u){float tie=1e-8*float(abs(int(j%side)-int(p.y))+abs(int(j/side%side)-int(p.y))+abs(int(j/(side*side))-int(p.z))),value=costs[k*nc+j].x+tie;if(value<best){best=value;index=j;}}
+ bestValue[lane]=best;bestIndex[lane]=index;barrier();for(uint stride=32u;stride>0u;stride>>=1u){if(lane<stride){float b=bestValue[lane+stride];uint j=bestIndex[lane+stride];if(b<bestValue[lane]||(b==bestValue[lane]&&j<bestIndex[lane])){bestValue[lane]=b;bestIndex[lane]=j;}}barrier();}
+ index=bestIndex[0];float second=uintBitsToFloat(0x7f800000u);for(uint j=lane;j<nc;j+=64u)if(abs(int(j%side)-int(index%side))>1||abs(int(j/side%side)-int(index/side%side))>1)second=min(second,costs[k*nc+j].x);
+ nextValue[lane]=second;barrier();for(uint stride=32u;stride>0u;stride>>=1u){if(lane<stride)nextValue[lane]=min(nextValue[lane],nextValue[lane+stride]);barrier();}if(lane!=0u)return;
+ best=bestValue[0];second=nextValue[0];vec4 m=p.w==0u?vec4(0):model[k];m.xy+=vec2(int(index%side)-int(p.y),int(index/side%side)-int(p.y))*v.z;m.z+=float(int(index/(side*side))-int(p.z))*v.w;
+ float en=costs[k*nc+index].y,scale=640.0/v.x,noise=sigma*sigma/(scale*scale);bool finiteBest=!isnan(best)&&!isinf(best);bool good=p.w==3u?finiteBest:finiteBest&&en>max(.01,noise*.25)&&best<1.25*en+4.0*noise;
+ if(p.w==0u)m.w=good&&!isnan(second)&&!isinf(second)&&(second-best)/max(second,1e-6)>.025?1.0:0.0;else m.w*=good?1.0:0.0;model[k]=m;
+}

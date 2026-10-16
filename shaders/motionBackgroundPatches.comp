@@ -1,0 +1,28 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { uint slots[]; };
+layout(std430,binding=2) buffer B2 { vec4 model[]; };
+layout(std430,binding=3) buffer B3 { vec2 patches[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uvec4 p;
+layout(std430,binding=5) buffer B5 { float deltas[]; };
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+uint group=gl_GlobalInvocationID.x,k=group/16u;if(k>=p.x)return;
+if(k==0u||model[k].w==0.0||deltas[group*65u+64u]==0.0){patches[group]=vec2(0,uintBitsToFloat(0x7f800000u));return;}
+float d[64];for(int j=0;j<64;j++)d[j]=deltas[group*65u+uint(j)];
+for(int j=1;j<64;j++){float t=d[j];int l=j-1;while(l>=0){if(d[l]<=t)break;d[l+1]=d[l];l--;}d[l+1]=t;}
+float median=d[32];for(int j=0;j<64;j++)d[j]=abs(d[j]-median);
+for(int j=1;j<64;j++){float t=d[j];int l=j-1;while(l>=0){if(d[l]<=t)break;d[l+1]=d[l];l--;}d[l+1]=t;}patches[group]=vec2(median,d[32]);
+
+}

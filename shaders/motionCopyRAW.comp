@@ -1,0 +1,19 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { float dst[]; };
+layout(std430,binding=2) buffer B2 { uint slots[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uvec4 p;
+
+vec2 motionPoint(vec2 p,vec4 m){vec2 v=p-vec2(319.5,255.5);float c=cos(m.z),s=sin(m.z);return vec2(c*v.x-s*v.y,s*v.x+c*v.y)+vec2(319.5,255.5)+m.xy;}
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+uint n=640*512;if(i>=n*p.x)return;uint j=slots[i/n]*n+i%n;dst[j]=float(rawAt(j));
+}

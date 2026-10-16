@@ -1,0 +1,41 @@
+#version 310 es
+#extension GL_EXT_shader_implicit_conversions : require
+precision highp float;
+precision highp int;
+layout(local_size_x=64) in;
+layout(std430,binding=0) buffer B0 { uint raw[]; };
+layout(std430,binding=1) buffer B1 { float counts[]; };
+layout(std430,binding=2) buffer B2 { float effective[]; };
+
+// Two exact RAW16 counts per SSBO word; no float widening or extra host copy.
+uint rawAt(uint i){return (raw[i>>1u]>>((i&1u)*16u))&65535u;}
+uniform uvec4 p;
+layout(std430,binding=4) buffer B4 { vec2 align[]; };
+uniform float sigma;
+layout(std430,binding=6) buffer B6 { uint slots[]; };
+
+void main(){
+uint i=gl_GlobalInvocationID.x;
+
+    if (i >= p.x) return;
+    uint base = slots[0] * p.x;
+    float ref = float(rawAt(base+i)), deltaSum = 0, sw = 1, sw2 = 1;
+    uint x = i % p.z, y = i / p.z;
+    if (x > 0 && y > 0 && x + 1 < p.z && y + 1 < p.w) {
+        for (uint k = 1; k < p.y; ++k) {
+            float mse = 0;
+            for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+                uint j = uint(int(i) + dy * int(p.z) + dx);
+                float d = float(int(rawAt(slots[k]*p.x+j)) - int(rawAt(base+j))) + align[k].x;
+                mse += d * d;
+            }
+            float robust = max(0., 1. - mse / (9. * 36. * sigma * sigma));
+            float w = robust * robust * align[k].y;
+            deltaSum += w * (float(int(rawAt(slots[k]*p.x+i)) - int(rawAt(base+i))) + align[k].x);
+            sw += w; sw2 += w*w;
+        }
+    }
+    counts[i] = ref + deltaSum / sw;
+    effective[i] = sw*sw/sw2;
+
+}
