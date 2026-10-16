@@ -53,16 +53,6 @@ sudo udevadm control --reload-rules
 
 重插机芯后，用桌面图标或 `~/.local/bin/itl612-start` 启动。不要以 root 运行界面。
 
-## 制作安装包
-
-在目标架构、目标发行版上安装上述构建依赖，再运行：
-
-```sh
-sudo apt install dpkg-dev
-sh packaging/build-deb.sh
-```
-
-输出为 `build-deb/itl612-cm5_0.1.0_arm64.deb`。依赖由实际二进制自动分析，程序使用系统 Qt、Mesa 和 FFmpeg。运行 `python3 packaging/make-source.py build-deb` 可生成独立源码包；构建产物和本机开发脚本不进入源码包。
 
 ## 常用操作
 
