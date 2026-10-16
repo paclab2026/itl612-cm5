@@ -1,12 +1,28 @@
 # ITL612 Thermal for Raspberry Pi CM5
 
+[简体中文](README.md) | [English](README.en.md)
+
 ITL612 Thermal 是面向 Raspberry Pi CM5 的 640×512 热像应用，支持 ITL612 Pro（Mars）USB 机芯、RAW16 实时处理、运动补偿多帧降噪、Autogate 自适应映射和机芯温度标记。提供中英界面、三种主题、拍照与录像，针对 Hackberry Pi 的 720×720 方屏设计。
 
-ITL612 Thermal is a native 640×512 thermal imaging application for Raspberry Pi CM5 and ITL612 Pro (Mars) USB cores. It features real-time RAW16 processing, motion-compensated temporal denoising, Autogate tone mapping, camera-reported temperature markers, bilingual menus, three themes, and photo/video capture, with a UI designed for the Hackberry Pi's 720×720 display.
+本项目使用的掌机硬件基于 **[ZitaoTech / HackberryPiCM5](https://github.com/ZitaoTech/HackberryPiCM5)** 项目：搭载 Raspberry Pi CM5、720×720 触摸屏与 BlackBerry 键盘的便携 Linux 设备。感谢该项目提供硬件设计和使用文档；本仓库提供配合 ITL612 Pro USB 热像机芯使用的应用软件。
 
-[Download ARM64 .deb](https://github.com/paclab2026/itl612-cm5/releases/download/v0.1.0/itl612-cm5_0.1.0_arm64.deb) · [v0.1.0 Release](https://github.com/paclab2026/itl612-cm5/releases/tag/v0.1.0) · [English installation guide](README.en.md)
+[下载 ARM64 .deb](https://github.com/paclab2026/itl612-cm5/releases/download/v0.1.0/itl612-cm5_0.1.0_arm64.deb) · [v0.1.0 Release](https://github.com/paclab2026/itl612-cm5/releases/tag/v0.1.0)
 
-面向 Hackberry Pi CM5 的原生热像应用：640×512 RAW16 实时处理、运动补偿多帧降噪、Autogate 映射、机芯温度读数、PNG 拍照和 H.264 MP4 录像。支持中文和英文界面。
+## 界面与外拍演示
+
+### CM5 主界面
+
+![CM5 实机主界面：Deep Amber 英文界面、右侧温度色条及下方拍摄菜单](docs/images/cm5-live-view.png)
+
+720×720 CM5 实机截图，使用 Deep Amber 皮肤和英文界面。状态位于右上角；温度色条位于画面右侧；下方提供 Autogate、伪色、锁窗、FFC、拍照、录像、文件和菜单入口。
+
+### 猫咪外拍
+
+![ITL612 Pro 机芯的 640×512 原尺寸猫咪热像视频帧](docs/images/outdoor-cat.png)
+
+从既有 ITL612 Pro（Mars）机芯外拍视频选取的一帧，保留 640×512 原尺寸与原有显示效果，可观察猫脸、耳朵、身体与周围植被、栏杆的热对比。此片段由早期 Apple 端应用录制，用于展示同款机芯的实际成像；不是 CM5 录制或 CM5 帧率测试。图片未经生成式处理、超分辨率或额外锐化；图中温度文字是原视频叠加信息，不代表独立标定结果。
+
+## 已验证环境
 
 已验证：CM5 8GB、720×720 显示屏、Raspberry Pi OS Bookworm 64 位、Mars USB `04b4:f7f7`。其他机芯、系统版本和树莓派型号尚未验证。机芯输入约 30 Hz；增强预览帧率取决于配置；MP4 为 25 fps。
 
